@@ -1,26 +1,14 @@
 package com.cjj.refresh;
 
 import android.content.Context;
-import android.net.Uri;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.animation.AccelerateInterpolator;
-import android.view.animation.Animation;
 import android.view.animation.BounceInterpolator;
-import android.view.animation.OvershootInterpolator;
-import android.view.animation.TranslateAnimation;
-import android.widget.ImageView;
 import android.widget.TextView;
 
-import com.facebook.drawee.backends.pipeline.Fresco;
-import com.facebook.drawee.interfaces.DraweeController;
-import com.facebook.drawee.view.SimpleDraweeView;
-import com.facebook.imagepipeline.request.ImageRequest;
-import com.facebook.imagepipeline.request.ImageRequestBuilder;
 import com.nineoldandroids.animation.Animator;
-import com.nineoldandroids.animation.AnimatorListenerAdapter;
 import com.nineoldandroids.animation.ObjectAnimator;
 import com.nineoldandroids.animation.ValueAnimator;
 
@@ -31,6 +19,11 @@ import com.nineoldandroids.animation.ValueAnimator;
 public class BeautifulRefreshLayout extends RefreshLayout {
     private float waveHeight = 200;
     private float headHeight = 120;
+    private final int SHAKE_TIME = 1000;//wave震动时间
+
+    private View mHeadView;
+    private WaveView mWaveView;
+    private TextView mTv_tip;
 
     public BeautifulRefreshLayout(Context context) {
         this(context, null, 0);
@@ -56,21 +49,9 @@ public class BeautifulRefreshLayout extends RefreshLayout {
         /**
          * 初始化headView
          */
-        final View headView = LayoutInflater.from(getContext()).inflate(R.layout.view_head, null);
-        final WaveView waveView = (WaveView) headView.findViewById(R.id.draweeView);
-        final TextView tv_tip = (TextView) headView.findViewById(R.id.tv_tip);
-        final RippleView rippleView = (RippleView) headView.findViewById(R.id.ripple);
-        final RainView rain = (RainView) headView.findViewById(R.id.rain);
-        rain.setVisibility(View.GONE);
-        rippleView.setRippleListener(new RippleView.RippleListener() {
-            @Override
-            public void onRippleFinish() {
-                if(listener!=null)
-                {
-                    listener.onRefresh(BeautifulRefreshLayout.this);
-                }
-            }
-        });
+        mHeadView = LayoutInflater.from(getContext()).inflate(R.layout.view_head, null);
+        mWaveView = (WaveView) mHeadView.findViewById(R.id.draweeView);
+        mTv_tip = (TextView) mHeadView.findViewById(R.id.tv_tip);
         /**
          * 设置波浪的高度
          */
@@ -82,7 +63,7 @@ public class BeautifulRefreshLayout extends RefreshLayout {
         /**
          * 设置headView
          */
-        setHeaderView(headView);
+        setHeaderView(mHeadView);
         /**
          * 监听波浪变化监听
          */
@@ -90,19 +71,16 @@ public class BeautifulRefreshLayout extends RefreshLayout {
             @Override
             public void onPulling(RefreshLayout refreshLayout, float fraction) {
                 float headW = DensityUtil.dip2px(getContext(), waveHeight);
-                waveView.setHeadHeight((int) (DensityUtil.dip2px(getContext(), headHeight) * limitValue(1, fraction)));
-                waveView.setWaveHeight((int) (headW * Math.max(0, fraction - 1)));
+                mWaveView.setHeadHeight((int) (DensityUtil.dip2px(getContext(), headHeight) * limitValue(1, fraction)));
+                mWaveView.setWaveHeight((int) (headW * Math.max(0, fraction - 1)));
 
-                waveView.invalidate();
+                mWaveView.invalidate();
 
-                if(DensityUtil.dip2px(getContext(), headHeight)> (int) (DensityUtil.dip2px(getContext(), headHeight) * limitValue(1, fraction)))
-                {
-                    tv_tip.setText("下拉下雨");
-                }else
-                {
-                    tv_tip.setText("松开下雨");
+                if (DensityUtil.dip2px(getContext(), headHeight) > (int) (DensityUtil.dip2px(getContext(), headHeight) * limitValue(1, fraction))) {
+                    mTv_tip.setText("下拉刷新");
+                } else {
+                    mTv_tip.setText("松开刷新");
                 }
-
 
 
             }
@@ -121,42 +99,61 @@ public class BeautifulRefreshLayout extends RefreshLayout {
         setPullToRefreshListener(new PullToRefreshListener() {
             @Override
             public void onRefresh(RefreshLayout refreshLayout) {
-                tv_tip.setText("下雨中...");
-                rain.setVisibility(View.VISIBLE);
-                rain.StartRain();
-                waveView.setHeadHeight((int) (DensityUtil.dip2px(getContext(), headHeight)));
-                ValueAnimator animator = ValueAnimator.ofInt(waveView.getWaveHeight(), 0,-300,0,-100,0);
+                mTv_tip.setText("刷新中...");
+                mWaveView.setHeadHeight((int) (DensityUtil.dip2px(getContext(), headHeight)));
+                ValueAnimator animator = ValueAnimator.ofInt(mWaveView.getWaveHeight(), 0, -300, 0, -100, 0);
                 animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
                     @Override
                     public void onAnimationUpdate(ValueAnimator animation) {
                         Log.i("anim", "value--->" + (int) animation.getAnimatedValue());
-                        waveView.setWaveHeight((int) animation.getAnimatedValue());
-                        waveView.invalidate();
+                        mWaveView.setWaveHeight((int) animation.getAnimatedValue());
+                        mWaveView.invalidate();
 
                     }
                 });
                 animator.setInterpolator(new BounceInterpolator());
-                animator.setDuration(1000);
+                animator.setDuration(SHAKE_TIME);
                 animator.start();
+                animator.addListener(new Animator.AnimatorListener() {
+                    @Override
+                    public void onAnimationStart(Animator animation) {
 
+                    }
 
-                refreshLayout.postDelayed(
-                        new Runnable() {
-                            @Override
-                            public void run() {
-                                rippleView.startReveal();
-                                rain.stopRain();
-                            }
-                        }, 3000
-                );
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        if (listener != null) {
+                            listener.onRefresh(BeautifulRefreshLayout.this);
+                        }
+                    }
+
+                    @Override
+                    public void onAnimationCancel(Animator animation) {
+
+                    }
+
+                    @Override
+                    public void onAnimationRepeat(Animator animation) {
+
+                    }
+                });
+
+//                refreshLayout.postDelayed(
+//                        new Runnable() {
+//                            @Override
+//                            public void run() {
+//                                if (listener != null) {
+//                                    listener.onRefresh(BeautifulRefreshLayout.this);
+//                                }
+//                            }
+//                        }, SHAKE_TIME);
             }
         });
     }
 
 
-    public void shakeAnim(View view)
-    {
-        ObjectAnimator animator = ObjectAnimator.ofFloat(view,"rotation",0,2,0,-2,0);
+    public void shakeAnim(View view) {
+        ObjectAnimator animator = ObjectAnimator.ofFloat(view, "rotation", 0, 2, 0, -2, 0);
         animator.setDuration(100);
         animator.setRepeatCount(-1);
         animator.setRepeatMode(ValueAnimator.RESTART);
@@ -166,6 +163,7 @@ public class BeautifulRefreshLayout extends RefreshLayout {
 
     /**
      * 限定值
+     *
      * @param a
      * @param b
      * @return
@@ -184,8 +182,8 @@ public class BeautifulRefreshLayout extends RefreshLayout {
     }
 
     private BuautifulRefreshListener listener;
-    public void setBuautifulRefreshListener(BuautifulRefreshListener listener)
-    {
+
+    public void setBuautifulRefreshListener(BuautifulRefreshListener listener) {
         this.listener = listener;
     }
 }

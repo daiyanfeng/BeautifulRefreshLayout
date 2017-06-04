@@ -34,32 +34,28 @@ import com.cjj.refresh.BeautifulRefreshLayout;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import android.os.Handler;
 
 public class SampleListFragment extends Fragment {
+
+    BeautifulRefreshLayout mBeautifulRefreshLayout;
+    private Handler mHandler = new Handler();
 
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View v = inflater.inflate(
                 R.layout.fragment_list, container, false);
-        BeautifulRefreshLayout beautifulRefreshLayout = (BeautifulRefreshLayout) v.findViewById(R.id.refresh);
-        beautifulRefreshLayout.setBuautifulRefreshListener(new BeautifulRefreshLayout.BuautifulRefreshListener() {
+        mBeautifulRefreshLayout = (BeautifulRefreshLayout) v.findViewById(R.id.refresh);
+        mBeautifulRefreshLayout.setBuautifulRefreshListener(new BeautifulRefreshLayout.BuautifulRefreshListener() {
             @Override
-            public void onRefresh(final BeautifulRefreshLayout refreshLayout) {
-//                refreshLayout.postDelayed(new Runnable() {
-//                    @Override
-//                    public void run() {
-//                        refreshLayout.finishRefreshing();
-//                    }
-//                }, 3000);
-//
-                refreshLayout.post(new Runnable() {
+            public void onRefresh(BeautifulRefreshLayout refreshLayout) {
+                mHandler.postDelayed(new Runnable() {
                     @Override
                     public void run() {
-                        refreshLayout.finishRefreshing();
+                        mBeautifulRefreshLayout.finishRefreshing();
                     }
-                });
-
+                },1000);
             }
         });
 

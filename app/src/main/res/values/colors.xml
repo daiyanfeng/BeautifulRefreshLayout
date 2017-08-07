@@ -2,4 +2,5 @@
 <resources>
     <color name="window_background">#e1e1e1</color>
     <color name="theme_statusbar_color">#673AB7</color>
+    <color name="t">#00ffffff</color>
 </resources>

@@ -1,0 +1,5 @@
+<resources>
+    <dimen name="waveHeight">45dp</dimen>
+    <dimen name="headHeight">130dp</dimen>
+    <!--<dimen name="floatview_marginTop">-75dp</dimen>-->
+</resources>

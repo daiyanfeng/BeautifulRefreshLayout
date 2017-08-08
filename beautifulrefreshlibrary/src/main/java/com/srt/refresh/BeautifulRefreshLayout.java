@@ -1,7 +1,6 @@
-package com.cjj.refresh;
+package com.srt.refresh;
 
 import android.content.Context;
-import android.support.v7.widget.RecyclerView;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -11,24 +10,28 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.nineoldandroids.animation.Animator;
-import com.nineoldandroids.animation.ObjectAnimator;
 import com.nineoldandroids.animation.ValueAnimator;
 
 
 /**
- * Created by cjj on 2015/8/4.
+ * Created by 戴延枫 on 2017/8/2.
  */
 public class BeautifulRefreshLayout extends RefreshLayout {
     private float waveHeight;
     private float headHeight;
+    private float footerHeight;
     private final int SHAKE_TIME = 1000;//wave震动时间
 
+    //刷新头部相关view
     private View mHeadView;
     private WaveView mWaveView;
     private GifView mFloatView;
     private GifView mBubblesView;//火箭气泡
     private ImageView mLoadingView;
     private TextView mTv_tip;
+    //加载更多相关view
+    private View mFooterView;
+    private ImageView mFooterLoadingView;
 
     public BeautifulRefreshLayout(Context context) {
         this(context, null, 0);
@@ -49,6 +52,7 @@ public class BeautifulRefreshLayout extends RefreshLayout {
     private void init(Context context, AttributeSet attrs) {
         waveHeight = context.getResources().getDimensionPixelSize(R.dimen.waveHeight);
         headHeight = context.getResources().getDimensionPixelSize(R.dimen.headHeight);
+        footerHeight = context.getResources().getDimensionPixelSize(R.dimen.footerview_height);
         /**
          * attrs  需要在xml设置什么属性  自己自定义吧  啊哈哈
          */
@@ -66,6 +70,11 @@ public class BeautifulRefreshLayout extends RefreshLayout {
         mBubblesView.setMovieResource(R.drawable.bubble_gif);
         mTv_tip = (TextView) mHeadView.findViewById(R.id.tv_tip);
         /**
+         * 初始化footerview
+         */
+        mFooterView = LayoutInflater.from(getContext()).inflate(R.layout.view_footer, null);
+        mFooterLoadingView = (ImageView) mFooterView.findViewById(R.id.footerloadingView);
+        /**
          * 设置波浪的高度
          */
         setWaveHeight(waveHeight);
@@ -73,6 +82,10 @@ public class BeautifulRefreshLayout extends RefreshLayout {
          * 设置headView的高度
          */
         setHeaderHeight(headHeight);
+        /**
+         * 设置footerView的高度
+         */
+        setFooterHeight(footerHeight);
         /**
          * 设置headView
          */
@@ -86,9 +99,20 @@ public class BeautifulRefreshLayout extends RefreshLayout {
          */
         setLoadingView(mLoadingView);
         /**
+         * 设置footerView
+         */
+        setFooterView(mFooterView);
+        /**
+         * 设置footerloadingview
+         */
+        setFooterLoadingView(mFooterLoadingView);
+        /**
          * 监听波浪变化监听
          */
-        setPullWaveListener(new PullWaveListener() {
+        setPullStateListener(new PullStateListener() {
+            /**
+             * 下拉中
+             */
             @Override
             public void onPulling(RefreshLayout refreshLayout, float offsetY) {
                 if (pullReleasingOA != null) {
@@ -97,10 +121,36 @@ public class BeautifulRefreshLayout extends RefreshLayout {
                 onPullingLogic(offsetY);
             }
 
+            /**
+             * 下拉松开
+             */
             @Override
             public void onPullReleasing(RefreshLayout refreshLayout, float offsetY) {
                 if (!refreshLayout.isRefreshing) {
                     onPullingLogic(offsetY);
+                }
+            }
+
+            /**
+             * 加载更多的上拉中回调
+             */
+            @Override
+            public void onLoadMorePulling(RefreshLayout refreshLayout, float offsetY) {
+                if (pullReleasingOA != null) {
+                    pullReleasingOA.cancel();
+                }
+                if (null != mFooterLayout) {
+                    mFooterLayout.setTranslationY(-offsetY);
+                }
+            }
+
+            /**
+             * 加载更多的pull回调
+             */
+            @Override
+            public void onLoadMorePullReleasing(RefreshLayout refreshLayout, float offsetY) {
+                if (null != mFooterLayout) {
+                    mFooterLayout.setTranslationY(-offsetY);
                 }
             }
         });
@@ -155,6 +205,19 @@ public class BeautifulRefreshLayout extends RefreshLayout {
                     }
                 });
             }
+
+            /**
+             * 加载更多中
+             *
+             * @param refreshLayout
+             */
+            @Override
+            public void onLoadMore(RefreshLayout refreshLayout) {
+                showFooterLoadingView();
+                if (listener != null) {
+                    listener.onLoadMore(BeautifulRefreshLayout.this);
+                }
+            }
         });
     }
 
@@ -176,9 +239,9 @@ public class BeautifulRefreshLayout extends RefreshLayout {
             mWaveView.setHeadHeight(0);
             mWaveView.setWaveHeight((int) (headW * Math.max(0, waveFraction)));
         }
-        Log.d("pull", "onPulling: getHeadHeight ==  " + mWaveView.getHeadHeight());
-        Log.d("pull", "onPulling: getWaveHeight ==  " + mWaveView.getWaveHeight());
-        Log.e("pull", "onPulling: offsetY ==  " + offsetY);
+//        Log.d("pull", "onPulling: getHeadHeight ==  " + mWaveView.getHeadHeight());
+//        Log.d("pull", "onPulling: getWaveHeight ==  " + mWaveView.getWaveHeight());
+//        Log.e("pull", "onPulling: offsetY ==  " + offsetY);
 
         mWaveView.invalidate();
         if (null != mFloatView) {
@@ -192,13 +255,13 @@ public class BeautifulRefreshLayout extends RefreshLayout {
     }
 
 
-    public void shakeAnim(View view) {
-        ObjectAnimator animator = ObjectAnimator.ofFloat(view, "rotation", 0, 2, 0, -2, 0);
-        animator.setDuration(100);
-        animator.setRepeatCount(-1);
-        animator.setRepeatMode(ValueAnimator.RESTART);
-        animator.start();
-    }
+//    public void shakeAnim(View view) {
+//        ObjectAnimator animator = ObjectAnimator.ofFloat(view, "rotation", 0, 2, 0, -2, 0);
+//        animator.setDuration(100);
+//        animator.setRepeatCount(-1);
+//        animator.setRepeatMode(ValueAnimator.RESTART);
+//        animator.start();
+//    }
 
 
     /**
@@ -221,20 +284,20 @@ public class BeautifulRefreshLayout extends RefreshLayout {
     }
 
     public interface BuautifulRefreshListener {
+        /**
+         * 刷新中
+         */
         void onRefresh(BeautifulRefreshLayout refreshLayout);
-//        /**
-//         * 加载更多中
-//         * @param recyclerView
-//         * @param newState
-//         * @param lastVisibleItem
-//         */
-//        void onLoadMore(RecyclerView recyclerView, int newState, int lastVisibleItem);
+
+        /**
+         * 加载更多中
+         */
+        void onLoadMore(BeautifulRefreshLayout refreshLayout);
     }
 
     private BuautifulRefreshListener listener;
 
     public void setBuautifulRefreshListener(BuautifulRefreshListener listener) {
         this.listener = listener;
-        super.setBuautifulRefreshListener(listener);
     }
 }

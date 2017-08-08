@@ -1,4 +1,4 @@
-package com.cjj.refresh;
+package com.srt.refresh;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -185,7 +185,8 @@ public class GifView extends View {
 
     /**
      * 外部控制播放帧数
-     * @param timePercent  显示总时长的百分比
+     *
+     * @param timePercent 显示总时长的百分比
      */
     public void updateframes(float timePercent) {
         // 取出动画的时长

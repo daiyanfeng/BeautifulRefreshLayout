@@ -2,5 +2,7 @@
     <dimen name="waveHeight">45dp</dimen>
     <dimen name="headHeight">130dp</dimen>
     <dimen name="floatview_marginTop">-66dp</dimen>
+    <dimen name="loadmore_threshold_value">-50dp</dimen>
+    <dimen name="footerview_height">60dp</dimen>
 </resources>
 

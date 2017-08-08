@@ -1,20 +1,4 @@
-/*
- * Copyright (C) 2015 The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-package com.cjj.beautifulrefreshlayout;
+package com.srt.beautifulrefreshlayout;
 
 import android.content.Context;
 import android.os.Bundle;
@@ -28,15 +12,15 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 
-
-import com.cjj.refresh.BeautifulRefreshLayout;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+
 import android.os.Handler;
 
-public class SampleListFragment extends Fragment {
+import com.srt.refresh.BeautifulRefreshLayout;
+
+public class SampleListFragment extends Fragment implements BeautifulRefreshLayout.BuautifulRefreshListener {
 
     BeautifulRefreshLayout mBeautifulRefreshLayout;
     private Handler mHandler = new Handler();
@@ -44,21 +28,10 @@ public class SampleListFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        View v = inflater.inflate(
-                R.layout.fragment_list, container, false);
+        View v = inflater.inflate(R.layout.fragment_list, container, false);
         mBeautifulRefreshLayout = (BeautifulRefreshLayout) v.findViewById(R.id.refresh);
-        mBeautifulRefreshLayout.setBuautifulRefreshListener(new BeautifulRefreshLayout.BuautifulRefreshListener() {
-            @Override
-            public void onRefresh(BeautifulRefreshLayout refreshLayout) {
-                mHandler.postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        mBeautifulRefreshLayout.finishRefreshing();
-                    }
-                },1000);
-            }
-        });
-
+        mBeautifulRefreshLayout.setLoadMoreEnable(false);
+        mBeautifulRefreshLayout.setBuautifulRefreshListener(this);
 
         RecyclerView rv = (RecyclerView) v.findViewById(R.id.recyclerview);
         setupRecyclerView(rv);
@@ -78,6 +51,32 @@ public class SampleListFragment extends Fragment {
             list.add(array[random.nextInt(array.length)]);
         }
         return list;
+    }
+
+    @Override
+    public void onRefresh(BeautifulRefreshLayout refreshLayout) {
+        mHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                mBeautifulRefreshLayout.finishRefreshing();
+            }
+        }, 1000);
+    }
+
+    /**
+     * 加载更多中
+     *
+     * @param refreshLayout
+     */
+    @Override
+    public void onLoadMore(BeautifulRefreshLayout refreshLayout) {
+        mHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+//                        Toast.makeText(getActivity(), "加载结束", Toast.LENGTH_SHORT).show();
+                mBeautifulRefreshLayout.finishLoadMore();
+            }
+        }, 3000);
     }
 
     public static class SimpleStringRecyclerViewAdapter
@@ -109,11 +108,9 @@ public class SampleListFragment extends Fragment {
 
         @Override
         public void onBindViewHolder(final ViewHolder holder, int position) {
-            if(position==0)
-            {
+            if (position == 0) {
                 holder.mImageView.setImageResource(R.drawable.bb);
-            }else if(position == 1)
-            {
+            } else if (position == 1) {
                 holder.mImageView.setImageResource(R.drawable.cc);
             }
 
@@ -121,7 +118,7 @@ public class SampleListFragment extends Fragment {
 
         @Override
         public int getItemCount() {
-            return 4;
+            return 1;
         }
     }
 }

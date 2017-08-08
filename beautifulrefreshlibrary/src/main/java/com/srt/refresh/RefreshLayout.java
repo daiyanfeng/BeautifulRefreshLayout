@@ -1,4 +1,4 @@
-package com.cjj.refresh;
+package com.srt.refresh;
 
 import android.animation.Animator;
 import android.animation.ObjectAnimator;
@@ -7,8 +7,6 @@ import android.annotation.TargetApi;
 import android.content.Context;
 import android.os.Build;
 import android.support.v4.view.ViewCompat;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Gravity;
@@ -25,7 +23,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 
 /**
- * Created by cjj on 2015/8/4.
+ * Created by 戴延枫 on 2017/8/1.
  */
 public class RefreshLayout extends FrameLayout {
     private Context mContext;
@@ -34,6 +32,9 @@ public class RefreshLayout extends FrameLayout {
 
     //头部的高度
     protected float mHeadHeight;
+
+    //footer的高度
+    protected float mFooterHeight;
 
     //子控件
     private View mChildView;
@@ -46,6 +47,10 @@ public class RefreshLayout extends FrameLayout {
     protected ImageView mLoadingView;
     //loadingView动画
     private Animation mLoadingAnim;
+    //footerView
+    protected FrameLayout mFooterLayout;
+    //footerLoadingView
+    protected ImageView mFooterLoadingView;
 
     //刷新的状态
     protected boolean isRefreshing;
@@ -55,6 +60,23 @@ public class RefreshLayout extends FrameLayout {
 
     //当前Y的位置
     private float mCurrentY;
+
+    //loadmore的状态
+    protected boolean isLoadMore;
+
+    /**
+     * 控件的状态
+     * 1.下拉刷新
+     * 2.加载更多
+     */
+    private int pullState;
+
+    /**
+     * 上拉加载更多是否可用
+     * true 可用
+     * false 不可用
+     */
+    private boolean loadMoreEnable;
 
     //动画的变化率
     private DecelerateInterpolator decelerateInterpolator;
@@ -74,7 +96,6 @@ public class RefreshLayout extends FrameLayout {
     public RefreshLayout(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         init(context);
-        Log.i("cjj", "init");
     }
 
     /**
@@ -100,58 +121,53 @@ public class RefreshLayout extends FrameLayout {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        Log.i("cjj", "onAttachedToWindow");
+
+        //获得子控件
+        mChildView = getChildAt(0);
 
         //添加头部
         FrameLayout headViewLayout = new FrameLayout(getContext());
         LayoutParams layoutParams = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0);
         layoutParams.gravity = Gravity.TOP;
         headViewLayout.setLayoutParams(layoutParams);
-
         mHeadLayout = headViewLayout;
-
         this.addView(mHeadLayout);
 
+        if (loadMoreEnable) {
+            //添加footer
+            FrameLayout footerViewLayout = new FrameLayout(getContext());
+            LayoutParams footerlayoutParams = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (int) mFooterHeight);
+            footerlayoutParams.gravity = Gravity.BOTTOM;
+            footerlayoutParams.bottomMargin = -(int) mFooterHeight;
+            footerViewLayout.setLayoutParams(footerlayoutParams);
 
-        //获得子控件
-        mChildView = getChildAt(0);
-
-//        if (mChildView == null) {
-//            return;
-//        }
-//        mChildView.animate().setInterpolator(new DecelerateInterpolator());//设置速率为递减
-//        mChildView.animate().setUpdateListener(//通过addUpdateListener()方法来添加一个动画的监听器
-//                new ValueAnimator.AnimatorUpdateListener() {
-//                    @Override
-//                    public void onAnimationUpdate(ValueAnimator animation) {
-//                        int height = (int) mChildView.getTranslationY();//获得mChildView当前y的位置
-//
-//                        Log.i("cjj", "mChildView.getTranslationY----------->" + height);
-//                        mHeadLayout.getLayoutParams().height = height;
-//                        mHeadLayout.requestLayout();//重绘
-//
-//                        if (pullWaveListener != null) {
-//                            pullWaveListener.onPullReleasing(RefreshLayout.this, height / mHeadHeight);
-//                        }
-//                    }
-//                }
-//        );
+            mFooterLayout = footerViewLayout;
+            this.addView(mFooterLayout);
+        }
+//        mChildView.getLayoutParams().height = ViewGroup.LayoutParams.WRAP_CONTENT;
+//        getLayoutParams().height = ViewGroup.LayoutParams.WRAP_CONTENT;
 
     }
 
     //由于animate().setUpdateListener必须在API 19以上才能使用，故使用ObjectAnimator代替
     private void setChildViewTransLationY(float... values) {
-        ObjectAnimator oa = ObjectAnimator.ofFloat(mChildView, View.TRANSLATION_Y, values);
-        oa.setInterpolator(new DecelerateInterpolator());
-        oa.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+        pullReleasingOA = ObjectAnimator.ofFloat(mChildView, View.TRANSLATION_Y, values);
+        pullReleasingOA.setInterpolator(new DecelerateInterpolator());
+        pullReleasingOA.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
             @Override
             public void onAnimationUpdate(ValueAnimator animation) {
-                int height = (int) mChildView.getTranslationY();//获得mChildView当前y的位置
-                mHeadLayout.getLayoutParams().height = height;
-                mHeadLayout.requestLayout();//重绘
+                if (pullState == 1) {
+                    int height = (int) mChildView.getTranslationY();//获得mChildView当前y的位置
+                    mHeadLayout.getLayoutParams().height = height;
+                    mHeadLayout.requestLayout();//重绘
+                } else if (pullState == 2) {
+                    if (null != mFooterLayout) {
+                        mFooterLayout.setTranslationY(mChildView.getTranslationY());
+                    }
+                }
             }
         });
-        oa.start();
+        pullReleasingOA.start();
     }
 
     /**
@@ -169,8 +185,31 @@ public class RefreshLayout extends FrameLayout {
                 int height = (int) mChildView.getTranslationY();//获得mChildView当前y的位置
                 mHeadLayout.getLayoutParams().height = height;
                 mHeadLayout.requestLayout();//重绘
-                if (pullWaveListener != null) {
-                    pullWaveListener.onPullReleasing(RefreshLayout.this, height);
+                if (pullStateListener != null) {
+                    pullStateListener.onPullReleasing(RefreshLayout.this, height);
+                }
+            }
+        });
+        pullReleasingOA.start();
+    }
+
+    /**
+     * 当用户松开手后，但是还没有触发加载更多时，已经显示的footer自动收回的动画
+     *
+     * @param values
+     */
+    private void setloadMoreReleasingTransLationY(float... values) {
+        pullReleasingOA = ObjectAnimator.ofFloat(mChildView, View.TRANSLATION_Y, values);
+        pullReleasingOA.setDuration(500);
+        pullReleasingOA.setInterpolator(new DecelerateInterpolator());
+        pullReleasingOA.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator animation) {
+                int height = -(int) mChildView.getTranslationY();//获得mChildView当前y的位置
+//                mFooterLayout.getLayoutParams().height = height;
+//                mFooterLayout.requestLayout();//重绘
+                if (pullStateListener != null) {
+                    pullStateListener.onLoadMorePullReleasing(RefreshLayout.this, height);
                 }
             }
         });
@@ -190,6 +229,7 @@ public class RefreshLayout extends FrameLayout {
         oa.addListener(new Animator.AnimatorListener() {
             @Override
             public void onAnimationStart(Animator animation) {
+                //替换飞翔的火箭gif
                 mFloatView.setMovieResource(R.drawable.pencil_fly_gif);
             }
 
@@ -211,7 +251,6 @@ public class RefreshLayout extends FrameLayout {
         oa.start();
     }
 
-
     /**
      * 拦截事件
      *
@@ -220,8 +259,7 @@ public class RefreshLayout extends FrameLayout {
      */
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
-        if (isRefreshing) return true;
-        if (isRefreshing) return true;
+        if (isRefreshing || isLoadMore) return true;
 
         switch (ev.getAction()) {
             case MotionEvent.ACTION_DOWN:
@@ -231,10 +269,12 @@ public class RefreshLayout extends FrameLayout {
             case MotionEvent.ACTION_MOVE:
                 float currentY = ev.getY();
                 float dy = currentY - mTouchY;
-                Log.e("dyf", "onInterceptTouchEvent: "+canChildScrollUp());
+                Log.e("dyf", "onInterceptTouchEvent: " + canChildScrollUp());
                 if (dy > 0 && !canChildScrollUp()) {
+                    pullState = 1;
                     return true;
-                }else if(dy < 0 && canChildLoadMore()){
+                } else if (loadMoreEnable && dy < 0 && !canChildScrollDown()) {
+                    pullState = 2;
                     return true;
                 }
                 break;
@@ -250,7 +290,7 @@ public class RefreshLayout extends FrameLayout {
      */
     @Override
     public boolean onTouchEvent(MotionEvent e) {
-        if (isRefreshing) {
+        if (isRefreshing || isLoadMore) {
             return super.onTouchEvent(e);
         }
 
@@ -259,41 +299,62 @@ public class RefreshLayout extends FrameLayout {
                 mCurrentY = e.getY();
 
                 float dy = mCurrentY - mTouchY;
-                dy = Math.max(0, dy);
-                dy = Math.min(mWaveHeight + mHeadHeight, dy);
+                if (pullState == 1) { //下拉刷新
+                    dy = Math.max(0, dy);
+                    dy = Math.min(mWaveHeight + mHeadHeight, dy);
 
-                if (mChildView != null) {
+                    if (mChildView != null) {
 //                    float offsetY = decelerateInterpolator.getInterpolation(dy / (mWaveHeight + mHeadHeight)) * dy;
-                    float offsetY = dy;
-                    mChildView.setTranslationY(offsetY);
-//                    if (null != mFloatView && mHeadHeight >= offsetY)
-//                        mFloatView.setTranslationY(offsetY);
-                    mHeadLayout.getLayoutParams().height = (int) offsetY;
-                    mHeadLayout.requestLayout();
+                        float offsetY = dy;
+                        mChildView.setTranslationY(offsetY);
+                        mHeadLayout.getLayoutParams().height = (int) offsetY;
+                        mHeadLayout.requestLayout();
 
-                    if (pullWaveListener != null) {
-//                        pullWaveListener.onPulling(RefreshLayout.this, offsetY / mHeadHeight);
-                        pullWaveListener.onPulling(RefreshLayout.this, offsetY);
+                        if (pullStateListener != null) {
+                            pullStateListener.onPulling(RefreshLayout.this, offsetY);
+                        }
+                    }
+                } else if (pullState == 2) { // 加载更多
+                    dy = Math.min(0, dy);
+                    dy = Math.max(-mFooterHeight, dy);
+
+                    if (mChildView != null) {
+                        float offsetY = dy;
+                        mChildView.setTranslationY(offsetY);
+                        if (pullStateListener != null) {
+                            pullStateListener.onLoadMorePulling(RefreshLayout.this, -offsetY);
+                        }
                     }
                 }
+
                 return true;
             case MotionEvent.ACTION_CANCEL:
             case MotionEvent.ACTION_UP:
                 if (mChildView != null) {
-                    if (mChildView.getTranslationY() >= mHeadHeight + mWaveHeight) {
-//                        mChildView.animate().translationY(mHeadHeight).start();
-                        setFloatViewTransLationY(-mFloatView.getHeight());
-                        setChildViewTransLationY(mHeadHeight);
-                        isRefreshing = true;
-                        if (pullToRefreshPullingListener != null) {
-                            pullToRefreshPullingListener.onRefresh(RefreshLayout.this);
+                    if (pullState == 1) { //下拉刷新
+                        if (mChildView.getTranslationY() >= mHeadHeight + mWaveHeight) {
+                            setFloatViewTransLationY(-mFloatView.getHeight());
+                            setChildViewTransLationY(mHeadHeight);
+                            isRefreshing = true;
+                            isLoadMore = false;
+                            if (pullToRefreshPullingListener != null) {
+                                pullToRefreshPullingListener.onRefresh(RefreshLayout.this);
+                            }
+                        } else {
+                            setPullReleasingTransLationY(0);
                         }
-                    } else {
-//                        mChildView.animate().translationY(0).start();
-//                        setFloatViewTransLationY(-mFloatView.getHeight());
-//                        setChildViewTransLationY(0);
-                        setPullReleasingTransLationY(0);
+                    } else if (pullState == 2) { // 加载更多
+                        if (-mChildView.getTranslationY() >= mFooterHeight) { //因为是负数
+                            isRefreshing = false;
+                            isLoadMore = true;
+                            if (pullToRefreshPullingListener != null) {
+                                pullToRefreshPullingListener.onLoadMore(RefreshLayout.this);
+                            }
+                        } else {
+                            setloadMoreReleasingTransLationY(0);
+                        }
                     }
+
 
                 }
                 return true;
@@ -302,7 +363,7 @@ public class RefreshLayout extends FrameLayout {
     }
 
     /**
-     * 用来判断是否可以上拉
+     * 用来判断顶部是否可以滚动
      *
      * @return boolean
      */
@@ -321,50 +382,34 @@ public class RefreshLayout extends FrameLayout {
             return ViewCompat.canScrollVertically(mChildView, -1);
         }
     }
-    int lastVisibleItem;
-    private boolean canLoadMore;
-    //loadmore的状态
-    protected boolean isLoadMore;
-    public boolean canChildLoadMore(){
-        canLoadMore = false;
-        if(mChildView instanceof RecyclerView){
-            final RecyclerView recyclerView = (RecyclerView) mChildView;
-            recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
-                @Override
-                public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
-                    super.onScrollStateChanged(recyclerView, newState);
-                    int count = recyclerView.getAdapter().getItemCount();
-                    if (newState == RecyclerView.SCROLL_STATE_IDLE && (lastVisibleItem + 1) == recyclerView.getAdapter().getItemCount()) {
-                        if (mListener != null) {
-                            canLoadMore = true;
-                            isLoadMore = true;
-//                            mListener.onLoadMore(recyclerView, newState, lastVisibleItem);
-                        }
-                    }else{
-                        canLoadMore = false;
-                    }
-                }
 
-                @Override
-                public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
-                    super.onScrolled(recyclerView, dx, dy);
-                    lastVisibleItem = ((LinearLayoutManager) recyclerView.getLayoutManager()).findLastVisibleItemPosition();
-                }
-            });
+    /**
+     * 判断底部是否可以滚动
+     *
+     * @return
+     */
+    public boolean canChildScrollDown() {
+        if (mChildView == null) {
+            return false;
         }
-        return canLoadMore;
-    }
-    private BeautifulRefreshLayout.BuautifulRefreshListener mListener;
-    public void setBuautifulRefreshListener(BeautifulRefreshLayout.BuautifulRefreshListener listener) {
-        mListener = listener;
+        if (Build.VERSION.SDK_INT < 14) {
+            if (mChildView instanceof AbsListView) {
+                final AbsListView absListView = (AbsListView) mChildView;
+                return absListView.getChildCount() > 0 && (absListView.getFirstVisiblePosition() > 0 || absListView.getChildAt(0).getTop() < absListView.getPaddingTop());
+            } else {
+                return ViewCompat.canScrollVertically(mChildView, 1) || mChildView.getScrollY() > 0;
+            }
+        } else {
+            return ViewCompat.canScrollVertically(mChildView, 1);
+        }
     }
 
     /**
-     * 刷新loadMore
+     * loadMore结束
      */
     public void finishLoadMore() {
+        hiddenFooterLoadingView();
         if (mChildView != null) {
-//            mChildView.animate().translationY(0).start();
             setChildViewTransLationY(0);
         }
         isLoadMore = false;
@@ -382,10 +427,10 @@ public class RefreshLayout extends FrameLayout {
     /**
      * 设置wave监听
      */
-    private PullWaveListener pullWaveListener;
+    private PullStateListener pullStateListener;
 
-    public void setPullWaveListener(PullWaveListener pullWaveListener) {
-        this.pullWaveListener = pullWaveListener;
+    public void setPullStateListener(PullStateListener pullStateListener) {
+        this.pullStateListener = pullStateListener;
     }
 
     /**
@@ -422,6 +467,23 @@ public class RefreshLayout extends FrameLayout {
     }
 
     /**
+     * 设置footerView
+     *
+     * @param footerView
+     */
+    public void setFooterView(final View footerView) {
+        post(new Runnable() {
+            @Override
+            public void run() {
+                if (loadMoreEnable) {
+                    mFooterLayout.addView(footerView);
+                }
+//                mFooterLayout.setY(mFooterLayout.getY() + mFooterHeight);
+            }
+        });
+    }
+
+    /**
      * 设置loadingView
      */
     public void setLoadingView(ImageView loadingView) {
@@ -453,6 +515,37 @@ public class RefreshLayout extends FrameLayout {
     }
 
     /**
+     * 设置footerloadingView
+     */
+    public void setFooterLoadingView(ImageView footerLoadingView) {
+        mFooterLoadingView = footerLoadingView;
+        mLoadingAnim = AnimationUtils.loadAnimation(mContext, R.anim.lodingview_progress);
+        LinearInterpolator lin = new LinearInterpolator();
+        mLoadingAnim.setInterpolator(lin);
+    }
+
+    /**
+     * 显示设置footerloadingView
+     */
+    public void showFooterLoadingView() {
+        if (mFooterLoadingView != null && mLoadingAnim != null) {
+//            mFooterLoadingView.setVisibility(View.VISIBLE);
+            mFooterLoadingView.clearAnimation();
+            mFooterLoadingView.startAnimation(mLoadingAnim);
+        }
+    }
+
+    /**
+     * 隐藏设置footerloadingView
+     */
+    public void hiddenFooterLoadingView() {
+        if (mFooterLoadingView != null && mLoadingAnim != null) {
+            mFooterLoadingView.clearAnimation();
+//            mFooterLoadingView.setVisibility(View.GONE);
+        }
+    }
+
+    /**
      * 设置wave的下拉高度
      *
      * @param waveHeight
@@ -468,5 +561,23 @@ public class RefreshLayout extends FrameLayout {
      */
     public void setHeaderHeight(float headHeight) {
         this.mHeadHeight = headHeight;
+    }
+
+    /**
+     * 设置footer的高度
+     *
+     * @param footerHeight
+     */
+    public void setFooterHeight(float footerHeight) {
+        this.mFooterHeight = footerHeight;
+    }
+
+    /**
+     * 上拉加载更多是否可用
+     * true 可用
+     * false 不可用
+     */
+    public void setLoadMoreEnable(boolean loadMoreEnable) {
+        this.loadMoreEnable = loadMoreEnable;
     }
 }

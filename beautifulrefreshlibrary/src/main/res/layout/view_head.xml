@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="wrap_content">
 
-    <com.cjj.refresh.WaveView
+    <com.srt.refresh.WaveView
         android:id="@+id/draweeView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -19,14 +19,14 @@
         android:textColor="#ffffff"
         android:textSize="14sp" />
 
-    <com.cjj.refresh.GifView
+    <com.srt.refresh.GifView
         android:id="@+id/floatView"
         android:layout_width="100dp"
         android:layout_height="100dp"
         android:layout_centerHorizontal="true"
         android:layout_marginTop="@dimen/floatview_marginTop" />
 
-    <com.cjj.refresh.GifView
+    <com.srt.refresh.GifView
         android:id="@+id/bubblesView"
         android:layout_width="190dp"
         android:layout_height="120dp"

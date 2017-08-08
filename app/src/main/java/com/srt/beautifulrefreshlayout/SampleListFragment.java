@@ -30,7 +30,7 @@ public class SampleListFragment extends Fragment implements BeautifulRefreshLayo
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View v = inflater.inflate(R.layout.fragment_list, container, false);
         mBeautifulRefreshLayout = (BeautifulRefreshLayout) v.findViewById(R.id.refresh);
-        mBeautifulRefreshLayout.setLoadMoreEnable(false);
+        mBeautifulRefreshLayout.setLoadMoreEnable(true);
         mBeautifulRefreshLayout.setBuautifulRefreshListener(this);
 
         RecyclerView rv = (RecyclerView) v.findViewById(R.id.recyclerview);
